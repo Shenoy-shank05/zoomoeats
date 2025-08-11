@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?  @unique
+  name      String?
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  addresses Address[]
+  orders    Order[]
+  cart      Cart?
+}
+
+enum Role {
+  USER
+  ADMIN
+  DRIVER
+  MERCHANT
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String?
+  line1     String
+  line2     String?
+  city      String
+  pincode   String
+  latitude  Float?
+  longitude Float?
+  isDefault Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Restaurant {
+  id          String  @id @default(cuid())
+  name        String
+  area        String?
+  cuisine     String?
+  rating      Float   @default(4.2)
+  isOpen      Boolean @default(true)
+  deliveryFee Int     @default(49)
+  minOrder    Int     @default(199)
+  imgUrl      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  dishes      Dish[]
+  orders      Order[]
+}
+
+model Dish {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  name          String
+  category      String
+  price         Int
+  isVeg         Boolean    @default(false)
+  isAvailable   Boolean    @default(true)
+  imgUrl        String?
+  description   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+}
+
+model Cart {
+  userId    String     @id
+  updatedAt DateTime   @updatedAt
+  items     CartItem[]
+  user      User       @relation(fields: [userId], references: [id])
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  dishId    String
+  qty       Int    @default(1)
+  priceSnap Int
+  custom    Json?
+  cart      Cart   @relation(fields: [cartId], references: [userId])
+  dish      Dish   @relation(fields: [dishId], references: [id])
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  userId        String
+  restaurantId  String
+  status        OrderStatus   @default(PENDING)
+  total         Int
+  deliveryFee   Int
+  tax           Int
+  addressSnap   Json
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentRef    String?
+  etaMinutes    Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         OrderItem[]
+  user          User          @relation(fields: [userId], references: [id])
+  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  ASSIGNED
+  ON_THE_WAY
+  DELIVERED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  dishId    String
+  name      String
+  price     Int
+  qty       Int
+  custom    Json?
+  order     Order @relation(fields: [orderId], references: [id])
+  dish      Dish  @relation(fields: [dishId], references: [id])
+}
