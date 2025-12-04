@@ -1,11 +1,51 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator'
+import { IsString, IsNumber, IsOptional, IsBoolean, Min } from 'class-validator';
+
 export class CreateDishDto {
-  @IsString() restaurantId: string
-  @IsString() name: string
-  @IsString() category: string
-  @IsInt() @Min(0) price: number
-  @IsOptional() @IsBoolean() isVeg?: boolean
-  @IsOptional() @IsBoolean() isAvailable?: boolean
-  @IsOptional() @IsString() imgUrl?: string
-  @IsOptional() @IsString() description?: string
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsNumber()
+  @Min(0)
+  price: number;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  ingredients?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  calories?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isVegetarian?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isVegan?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isGlutenFree?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isAvailable?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  preparationTime?: number;
+
+  @IsString()
+  restaurantId: string;
 }

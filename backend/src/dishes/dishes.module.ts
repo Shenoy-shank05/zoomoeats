@@ -1,11 +1,10 @@
-import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
-import { DishesService } from './dishes.service'
-import { DishesController } from './dishes.controller'
+import { Module } from '@nestjs/common';
+import { DishesService } from './dishes.service';
+import { DishesController } from './dishes.controller';
 
-@Module({ 
-  imports: [JwtModule],
-  providers: [DishesService], 
-  controllers: [DishesController] 
+@Module({
+  controllers: [DishesController],
+  providers: [DishesService],
+  exports: [DishesService],
 })
 export class DishesModule {}

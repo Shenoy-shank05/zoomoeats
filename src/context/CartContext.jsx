@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, useEffect } from "react";
-import apiService from "../services/api";
+import apiService from "../services/apiService";
 
 const CartCtx = createContext();
 

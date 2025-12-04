@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FiSliders, FiStar, FiSearch } from "react-icons/fi";
-import apiService from "./services/api";
+import apiService from "./services/apiService";
 
 export default function RestaurantsPage() {
   const loc = useLocation();

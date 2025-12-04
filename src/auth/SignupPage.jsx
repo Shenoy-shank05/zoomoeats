@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiMail, FiLock, FiUser, FiUserPlus, FiPhone } from "react-icons/fi";
-import apiService from "../services/api";
+import apiService from "../services/apiService";
 
 export default function SignupPage() {
   const nav = useNavigate();
@@ -35,9 +35,11 @@ export default function SignupPage() {
       const profile = await apiService.getProfile();
       localStorage.setItem("ze_user", JSON.stringify(profile));
       
-      nav("/");
+      // Show success alert and redirect to login page
+      alert("Signup successful! Please log in to continue.");
+      nav("/login");
     } catch (err) {
-      if (err.message.includes("400")) {
+      if (err.message.includes("409")) {
         setError("Email already exists. Please use a different email or try logging in.");
       } else {
         setError("Failed to create account. Please try again.");

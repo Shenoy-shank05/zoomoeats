@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiMail, FiLock, FiLogIn } from "react-icons/fi";
-import apiService from "../services/api";
+import apiService from "../services/apiService";
+import { useUser } from "../context/UserContext";
 
 export default function LoginPage() {
   const nav = useNavigate();
+  const { setUser } = useUser(); // Access setUser from UserContext
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,8 +27,16 @@ export default function LoginPage() {
       // Get user profile after successful login
       const profile = await apiService.getProfile();
       localStorage.setItem("ze_user", JSON.stringify(profile));
-      
-      nav("/");
+      setUser(profile); // Update global user state
+
+      // Role-based redirection
+      if (profile.role === "ADMIN") {
+        nav("/admin");
+      } else if (profile.role === "MERCHANT") {
+        nav("/owner");
+      } else {
+        nav("/");
+      }
     } catch (err) {
       setError("Invalid email or password. Please try again.");
       console.error("Login failed:", err);

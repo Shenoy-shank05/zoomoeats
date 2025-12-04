@@ -1,31 +1,59 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
-import { CartService } from './cart.service'
-import { AuthGuard } from '../common/auth.guard'
-import { CurrentUser } from '../common/current-user.decorator'
-import { AddItemDto } from './dto/add-item.dto'
-import { UpdateItemDto } from './dto/update-item.dto'
+import { 
+  Controller, 
+  Get, 
+  Post, 
+  Body, 
+  Patch, 
+  Param, 
+  Delete, 
+  UseGuards, 
+  ValidationPipe 
+} from '@nestjs/common';
+import { CartService } from './cart.service';
+import { AddItemDto } from './dto/add-item.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
+import { JwtAuthGuard } from '../common/auth.guard';
+import { CurrentUser } from '../common/current-user.decorator';
 
 @Controller('cart')
-@UseGuards(AuthGuard)
+@UseGuards(JwtAuthGuard)
 export class CartController {
-  constructor(private svc: CartService) {}
+  constructor(private readonly cartService: CartService) {}
 
   @Get()
-  get(@CurrentUser() u: any) { return this.svc.get(u.sub) }
+  getCart(@CurrentUser() user: any) {
+    return this.cartService.getCart(user.id);
+  }
+
+  @Get('summary')
+  getCartSummary(@CurrentUser() user: any) {
+    return this.cartService.getCartSummary(user.id);
+  }
 
   @Post('items')
-  add(@CurrentUser() u: any, @Body() dto: AddItemDto) { 
-    return this.svc.add(u.sub, dto as any) 
+  addItem(
+    @CurrentUser() user: any,
+    @Body(ValidationPipe) addItemDto: AddItemDto,
+  ) {
+    return this.cartService.addItem(user.id, addItemDto);
   }
 
   @Patch('items/:id')
-  update(@Param('id') id: string, @Body() dto: UpdateItemDto) { 
-    return this.svc.update(id, dto.qty) 
+  updateItem(
+    @CurrentUser() user: any,
+    @Param('id') itemId: string,
+    @Body(ValidationPipe) updateItemDto: UpdateItemDto,
+  ) {
+    return this.cartService.updateItem(user.id, itemId, updateItemDto);
   }
 
   @Delete('items/:id')
-  del(@Param('id') id: string) { return this.svc.remove(id) }
+  removeItem(@CurrentUser() user: any, @Param('id') itemId: string) {
+    return this.cartService.removeItem(user.id, itemId);
+  }
 
   @Delete('items')
-  clear(@CurrentUser() u: any) { return this.svc.clear(u.sub) }
+  clearCart(@CurrentUser() user: any) {
+    return this.cartService.clearCart(user.id);
+  }
 }

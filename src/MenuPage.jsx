@@ -1,20 +1,33 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useContext } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useCart } from "./context/CartContext";
-import { FiArrowLeft, FiClock, FiStar, FiRefreshCw } from "react-icons/fi";
-import apiService from "./services/api";
+import { UserContext } from "./context/UserContext";
+import { FiArrowLeft, FiClock, FiStar, FiRefreshCw, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import apiService from "./services/apiService";
 
 export default function MenuPage() {
   const { id } = useParams();
   const location = useLocation();
   const mode = new URLSearchParams(location.search).get("mode") || "delivery";
   const { add } = useCart();
+  const { user } = useContext(UserContext);
 
   const [restaurant, setRestaurant] = useState(null);
   const [dishes, setDishes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("All");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newDish, setNewDish] = useState({
+    name: "",
+    price: "",
+    description: "",
+    category: "",
+    isVeg: true,
+    isAvailable: true,
+  });
+
+  const isMerchantOrAdmin = user && (user.role === "MERCHANT" || user.role === "ADMIN");
 
   const categories = useMemo(() => {
     if (!dishes.length) return ["All"];
@@ -42,6 +55,41 @@ export default function MenuPage() {
       console.error("Failed to fetch restaurant data:", err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAddDish() {
+    try {
+      const dishData = {
+        ...newDish,
+        price: parseFloat(newDish.price),
+        restaurantId: id,
+      };
+      const addedDish = await apiService.createDish(dishData);
+      setDishes([...dishes, addedDish]);
+      setShowAddModal(false);
+      setNewDish({
+        name: "",
+        price: "",
+        description: "",
+        category: "",
+        isVeg: true,
+        isAvailable: true,
+      });
+    } catch (err) {
+      console.error("Failed to add dish:", err);
+      alert("Failed to add dish. Please try again.");
+    }
+  }
+
+  async function handleDeleteDish(dishId) {
+    if (!window.confirm("Are you sure you want to delete this dish?")) return;
+    try {
+      await apiService.delete(`/dishes/${dishId}`);
+      setDishes(dishes.filter(d => d.id !== dishId));
+    } catch (err) {
+      console.error("Failed to delete dish:", err);
+      alert("Failed to delete dish. Please try again.");
     }
   }
 
@@ -194,6 +242,17 @@ export default function MenuPage() {
               </div>
             </div>
 
+            {isMerchantOrAdmin && (
+              <div className="mt-4 mb-6">
+                <button 
+                  onClick={() => setShowAddModal(true)} 
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition flex items-center gap-2"
+                >
+                  <FiPlus /> Add New Menu Item
+                </button>
+              </div>
+            )}
+
             <div className="mt-4 grid sm:grid-cols-2 gap-4">
               {list.map(dish => (
                 <div key={dish.id} className="rounded-2xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10 bg-white dark:bg-white/5 hover:shadow-lg transition">
@@ -247,6 +306,14 @@ export default function MenuPage() {
                     >
                       {dish.isAvailable ? "Add to Cart" : "Out of Stock"}
                     </button>
+                    {isMerchantOrAdmin && (
+                      <button 
+                        onClick={() => handleDeleteDish(dish.id)} 
+                        className="mt-2 px-3 py-1 text-red-600 flex items-center gap-1 text-sm"
+                      >
+                        <FiTrash2 /> Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -262,6 +329,71 @@ export default function MenuPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Dish Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-[#0b0f0c] p-6 rounded-2xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-lg">Add New Dish</h2>
+              <button onClick={() => setShowAddModal(false)}><FiX /></button>
+            </div>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Dish Name"
+                value={newDish.name}
+                onChange={(e) => setNewDish({ ...newDish, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/10 focus:outline-none"
+              />
+              <input
+                type="number"
+                placeholder="Price"
+                value={newDish.price}
+                onChange={(e) => setNewDish({ ...newDish, price: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/10 focus:outline-none"
+              />
+              <input
+                type="text"
+                placeholder="Category"
+                value={newDish.category}
+                onChange={(e) => setNewDish({ ...newDish, category: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/10 focus:outline-none"
+              />
+              <textarea
+                placeholder="Description"
+                value={newDish.description}
+                onChange={(e) => setNewDish({ ...newDish, description: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/10 focus:outline-none h-24"
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={newDish.isVeg}
+                  onChange={(e) => setNewDish({ ...newDish, isVeg: e.target.checked })}
+                  id="isVeg"
+                />
+                <label htmlFor="isVeg">Vegetarian</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={newDish.isAvailable}
+                  onChange={(e) => setNewDish({ ...newDish, isAvailable: e.target.checked })}
+                  id="isAvailable"
+                />
+                <label htmlFor="isAvailable">Available</label>
+              </div>
+              <button 
+                onClick={handleAddDish}
+                className="w-full px-3 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition"
+              >
+                Add Dish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

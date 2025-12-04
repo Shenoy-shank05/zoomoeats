@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,135 +10,212 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  phone     String?  @unique
-  name      String?
-  password  String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  addresses Address[]
-  orders    Order[]
-  cart      Cart?
-}
-
-enum Role {
+enum UserRole {
   USER
   ADMIN
   DRIVER
   MERCHANT
 }
 
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          UserRole  @default(USER)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  addresses     Address[]
+  restaurants   Restaurant[]
+  cart          Cart?
+  orders        Order[]
+  reviews       Review[]
+  driver        Driver?
+}
+
 model Address {
-  id        String   @id @default(cuid())
-  userId    String
-  label     String?
-  line1     String
-  line2     String?
-  city      String
-  pincode   String
-  latitude  Float?
-  longitude Float?
-  isDefault Boolean  @default(false)
-  user      User     @relation(fields: [userId], references: [id])
+  id            String    @id @default(uuid())
+  street        String
+  city          String
+  state         String
+  zipCode       String
+  country       String    @default("USA")
+  isDefault     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders        Order[]
 }
 
 model Restaurant {
-  id          String  @id @default(cuid())
-  name        String
-  area        String?
-  cuisine     String?
-  rating      Float   @default(4.2)
-  isOpen      Boolean @default(true)
-  deliveryFee Int     @default(49)
-  minOrder    Int     @default(199)
-  imgUrl      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  dishes      Dish[]
-  orders      Order[]
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  imageUrl      String?
+  address       String
+  phone         String?
+  email         String?
+  openingHours  String?
+  cuisineType   String?
+  priceRange    String?   // $ to $$$$
+  rating        Float?    @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  ownerId       String
+  owner         User      @relation(fields: [ownerId], references: [id])
+  dishes        Dish[]
+  orders        Order[]
+  reviews       Review[]
 }
 
 model Dish {
-  id            String     @id @default(cuid())
-  restaurantId  String
+  id            String    @id @default(uuid())
   name          String
-  category      String
-  price         Int
-  isVeg         Boolean    @default(false)
-  isAvailable   Boolean    @default(true)
-  imgUrl        String?
   description   String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  price         Float
+  imageUrl      String?
+  ingredients   String?
+  calories      Int?
+  isVegetarian  Boolean   @default(false)
+  isVegan       Boolean   @default(false)
+  isGlutenFree  Boolean   @default(false)
+  isAvailable   Boolean   @default(true)
+  preparationTime Int?     // in minutes
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   cartItems     CartItem[]
   orderItems    OrderItem[]
 }
 
 model Cart {
-  userId    String     @id
-  updatedAt DateTime   @updatedAt
-  items     CartItem[]
-  user      User       @relation(fields: [userId], references: [id])
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items         CartItem[]
 }
 
 model CartItem {
-  id        String @id @default(cuid())
-  cartId    String
-  dishId    String
-  qty       Int    @default(1)
-  priceSnap Int
-  custom    Json?
-  cart      Cart   @relation(fields: [cartId], references: [userId])
-  dish      Dish   @relation(fields: [dishId], references: [id])
+  id            String    @id @default(uuid())
+  quantity      Int       @default(1)
+  specialInstructions String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  cartId        String
+  cart          Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  dishId        String
+  dish          Dish      @relation(fields: [dishId], references: [id])
 }
 
 model Order {
-  id            String        @id @default(cuid())
+  id            String    @id @default(uuid())
+  status        OrderStatus @default(PENDING)
+  subtotal      Float
+  total         Float
+  deliveryFee   Float?
+  tax           Float?
+  tip           Float?
+  specialInstructions String?
+  estimatedDeliveryTime DateTime?
+  actualDeliveryTime DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
   userId        String
+  user          User      @relation(fields: [userId], references: [id])
   restaurantId  String
-  status        OrderStatus   @default(PENDING)
-  total         Int
-  deliveryFee   Int
-  tax           Int
-  addressSnap   Json
-  paymentStatus PaymentStatus @default(PENDING)
-  paymentRef    String?
-  etaMinutes    Int?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  addressId     String?
+  address       Address?  @relation(fields: [addressId], references: [id])
   items         OrderItem[]
-  user          User          @relation(fields: [userId], references: [id])
-  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id])
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  ASSIGNED
-  ON_THE_WAY
-  DELIVERED
-  CANCELED
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
+  payment       Payment?
+  driverId      String?
+  driver        Driver?   @relation(fields: [driverId], references: [id])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
-  orderId   String
-  dishId    String
-  name      String
-  price     Int
-  qty       Int
-  custom    Json?
-  order     Order @relation(fields: [orderId], references: [id])
-  dish      Dish  @relation(fields: [dishId], references: [id])
+  id            String    @id @default(uuid())
+  quantity      Int
+  price         Float     // Price at time of order
+  specialInstructions String?
+  
+  // Relations
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dishId        String
+  dish          Dish      @relation(fields: [dishId], references: [id])
+}
+
+model Payment {
+  id            String    @id @default(uuid())
+  amount        Float
+  currency      String    @default("USD")
+  status        String    // PENDING, COMPLETED, FAILED
+  provider      String    // STRIPE, PAYPAL, etc.
+  paymentIntentId String?
+  receiptUrl    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  orderId       String    @unique
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Driver {
+  id            String    @id @default(uuid())
+  isAvailable   Boolean   @default(false)
+  currentLat    Float?
+  currentLng    Float?
+  vehicleType   String?
+  vehiclePlate  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders        Order[]
+}
+
+model Review {
+  id            String    @id @default(uuid())
+  rating        Int       // 1-5
+  comment       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 }

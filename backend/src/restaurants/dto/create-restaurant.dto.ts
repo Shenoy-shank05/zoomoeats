@@ -1,9 +1,41 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator'
+import { IsString, IsOptional, IsNumber, IsBoolean } from 'class-validator';
+
 export class CreateRestaurantDto {
-  @IsString() name: string
-  @IsOptional() @IsString() area?: string
-  @IsOptional() @IsString() cuisine?: string
-  @IsOptional() @IsInt() @Min(0) deliveryFee?: number
-  @IsOptional() @IsInt() @Min(0) minOrder?: number
-  @IsOptional() @IsString() imgUrl?: string
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsString()
+  address: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  openingHours?: string;
+
+  @IsOptional()
+  @IsString()
+  cuisineType?: string;
+
+  @IsOptional()
+  @IsString()
+  priceRange?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

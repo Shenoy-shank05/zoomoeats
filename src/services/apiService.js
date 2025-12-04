@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE || 'http://localhost:3001/api';
 
 class ApiService {
   constructor() {
@@ -43,11 +43,29 @@ class ApiService {
     }
   }
 
-  // Generic DELETE method
-  async delete(endpoint) {
+  // Generic HTTP methods
+  async get(endpoint, options = {}) {
+    return this.request(endpoint, { method: 'GET', ...options });
+  }
+
+  async post(endpoint, data, options = {}) {
     return this.request(endpoint, {
-      method: 'DELETE',
+      method: 'POST',
+      body: JSON.stringify(data),
+      ...options,
     });
+  }
+
+  async patch(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      ...options,
+    });
+  }
+
+  async delete(endpoint, options = {}) {
+    return this.request(endpoint, { method: 'DELETE', ...options });
   }
 
   // Auth endpoints
@@ -194,6 +212,27 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ total }),
     });
+  }
+
+  // Legacy functions for backward compatibility
+  async fetchRestaurants() {
+    try {
+      const response = await this.get('/restaurants');
+      return response.data || response;
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      return [];
+    }
+  }
+
+  async fetchOffers() {
+    try {
+      const response = await this.get('/promotions');
+      return response.data || response;
+    } catch (error) {
+      console.error('Error fetching offers:', error);
+      return [];
+    }
   }
 }
 

@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
-import { OrdersService } from './orders.service'
-import { OrdersController } from './orders.controller'
+import { Module } from '@nestjs/common';
+import { OrdersService } from './orders.service';
+import { OrdersController } from './orders.controller';
+import { PrismaModule } from '../common/prisma.module';
 
-@Module({ 
-  imports: [JwtModule],
-  providers: [OrdersService], 
-  controllers: [OrdersController] 
+@Module({
+  imports: [PrismaModule],
+  controllers: [OrdersController],
+  providers: [OrdersService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}
