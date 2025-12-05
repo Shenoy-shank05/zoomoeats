@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
@@ -7,6 +11,10 @@ import { UpdateItemDto } from './dto/update-item.dto';
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Get cart for a user.
+   * If cart doesn't exist, creates an empty cart.
+   */
   async getCart(userId: string) {
     let cart = await this.prisma.cart.findUnique({
       where: { userId },
@@ -29,7 +37,6 @@ export class CartService {
       },
     });
 
-    // Create cart if it doesn't exist
     if (!cart) {
       cart = await this.prisma.cart.create({
         data: { userId },
@@ -56,132 +63,128 @@ export class CartService {
     return cart;
   }
 
+  /**
+   * Add or update an item in the cart.
+   * quantity from DTO is treated as FINAL quantity (not an increment).
+   * If cart has items from another restaurant, clears it first.
+   */
   async addItem(userId: string, addItemDto: AddItemDto) {
-    const { dishId, qty, priceSnap, specialInstructions } = addItemDto;
+  const { dishId, quantity, specialInstructions } = addItemDto;
 
-    // Verify dish exists and is available
-    const dish = await this.prisma.dish.findUnique({
-      where: { id: dishId },
-      include: {
-        restaurant: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+  if (quantity <= 0) {
+    throw new BadRequestException('Quantity must be a positive integer');
+  }
+
+  // 1) Validate dish
+  const dish = await this.prisma.dish.findUnique({
+    where: { id: dishId },
+    include: {
+      restaurant: {
+        select: { id: true, name: true },
       },
+    },
+  });
+
+  if (!dish) {
+    throw new NotFoundException('Dish not found');
+  }
+
+  if (!dish.isAvailable) {
+    throw new BadRequestException('Dish is not available');
+  }
+
+  // 2) Ensure cart exists (WITHOUT relying on items)
+  let cart = await this.prisma.cart.findUnique({
+    where: { userId },
+  });
+
+  if (!cart) {
+    cart = await this.prisma.cart.create({
+      data: { userId },
     });
+  }
 
-    if (!dish) {
-      throw new NotFoundException('Dish not found');
-    }
-
-    if (!dish.isAvailable) {
-      throw new BadRequestException('Dish is not available');
-    }
-
-    // Get or create cart
-    let cart = await this.prisma.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          include: {
-            dish: {
-              include: {
-                restaurant: true,
-              },
-            },
-          },
-        },
+  // 3) Enforce single-restaurant cart:
+  //    Look at *one* existing item (if any) to determine cart restaurant
+  const anyExistingItem = await this.prisma.cartItem.findFirst({
+    where: { cartId: cart.id },
+    include: {
+      dish: {
+        include: { restaurant: true },
       },
-    });
+    },
+  });
 
-    if (!cart) {
-      cart = await this.prisma.cart.create({
-        data: { userId },
-        include: {
-          items: {
-            include: {
-              dish: {
-                include: {
-                  restaurant: true,
-                },
-              },
-            },
-          },
-        },
-      });
-    }
-
-    // Check if adding from different restaurant
-    if (cart.items.length > 0) {
-      const existingRestaurantId = cart.items[0].dish.restaurantId;
-      if (existingRestaurantId !== dish.restaurantId) {
-        throw new BadRequestException(
-          'Cannot add items from different restaurants. Please clear your cart first.',
-        );
-      }
-    }
-
-    // Check if item already exists in cart
-    const existingItem = cart.items.find((item) => item.dishId === dishId);
-
-    if (existingItem) {
-      // Update quantity
-      const updatedItem = await this.prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: {
-          quantity: existingItem.quantity + qty,
-          specialInstructions,
-        },
-        include: {
-          dish: {
-            include: {
-              restaurant: {
-                select: {
-                  id: true,
-                  name: true,
-                  imageUrl: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      return updatedItem;
-    } else {
-      // Add new item
-      const newItem = await this.prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          dishId,
-          quantity: qty,
-          specialInstructions,
-        },
-        include: {
-          dish: {
-            include: {
-              restaurant: {
-                select: {
-                  id: true,
-                  name: true,
-                  imageUrl: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      return newItem;
+  if (anyExistingItem) {
+    const existingRestaurantId = anyExistingItem.dish.restaurant.id;
+    if (existingRestaurantId !== dish.restaurant.id) {
+      await this.clearCart(userId);
+      // cart row still exists, just empty items
     }
   }
 
-  async updateItem(userId: string, itemId: string, updateItemDto: UpdateItemDto) {
-    const { qty, specialInstructions } = updateItemDto;
+  // 4) Load ALL items for this cart + dish to avoid duplicates
+  const itemsForDish = await this.prisma.cartItem.findMany({
+    where: {
+      cartId: cart.id,
+      dishId,
+    },
+  });
 
-    // Verify item belongs to user's cart
+  await this.prisma.$transaction(async (tx) => {
+    if (itemsForDish.length === 0) {
+      // No existing item at all → create
+      await tx.cartItem.create({
+        data: {
+          cartId: cart.id,
+          dishId,
+          quantity,
+          specialInstructions,
+        },
+      });
+    } else {
+      const [primary, ...duplicates] = itemsForDish;
+
+      // If there were duplicates before, remove the extras
+      if (duplicates.length > 0) {
+        await tx.cartItem.deleteMany({
+          where: {
+            id: { in: duplicates.map((d) => d.id) },
+          },
+        });
+      }
+
+      // Update the remaining row with the FINAL quantity
+      await tx.cartItem.update({
+        where: { id: primary.id },
+        data: {
+          quantity,
+          specialInstructions,
+        },
+      });
+    }
+  });
+
+  // 5) Return fresh cart with items + dish + restaurant info
+  return this.getCart(userId);
+}
+
+
+  /**
+   * Update quantity and/or special instructions for a cart item.
+   * quantity is final value; 0 removes the item.
+   */
+  async updateItem(
+    userId: string,
+    itemId: string,
+    updateItemDto: UpdateItemDto,
+  ) {
+    const { quantity, specialInstructions } = updateItemDto;
+
+    if (quantity < 0) {
+      throw new BadRequestException('Quantity must be a non-negative integer');
+    }
+
     const item = await this.prisma.cartItem.findFirst({
       where: {
         id: itemId,
@@ -195,10 +198,17 @@ export class CartService {
       throw new NotFoundException('Cart item not found');
     }
 
+    if (quantity === 0) {
+      await this.prisma.cartItem.delete({
+        where: { id: itemId },
+      });
+      return { message: 'Item removed from cart' };
+    }
+
     const updatedItem = await this.prisma.cartItem.update({
       where: { id: itemId },
       data: {
-        quantity: qty,
+        quantity,
         specialInstructions,
       },
       include: {
@@ -219,8 +229,10 @@ export class CartService {
     return updatedItem;
   }
 
+  /**
+   * Remove a single item from the cart.
+   */
   async removeItem(userId: string, itemId: string) {
-    // Verify item belongs to user's cart
     const item = await this.prisma.cartItem.findFirst({
       where: {
         id: itemId,
@@ -241,6 +253,9 @@ export class CartService {
     return { message: 'Item removed from cart' };
   }
 
+  /**
+   * Clear all items from the user's cart.
+   */
   async clearCart(userId: string) {
     const cart = await this.prisma.cart.findUnique({
       where: { userId },
@@ -257,6 +272,9 @@ export class CartService {
     return { message: 'Cart cleared successfully' };
   }
 
+  /**
+   * Get cart plus a price summary (subtotal, tax, deliveryFee, total).
+   */
   async getCartSummary(userId: string) {
     const cart = await this.getCart(userId);
 
@@ -266,7 +284,7 @@ export class CartService {
     );
 
     const deliveryFee = cart.items.length > 0 ? 49 : 0;
-    const tax = Math.round(subtotal * 0.05); // 5% tax
+    const tax = Math.round(subtotal * 0.05);
     const total = subtotal + deliveryFee + tax;
 
     return {
@@ -276,7 +294,10 @@ export class CartService {
         deliveryFee,
         tax,
         total,
-        itemCount: cart.items.reduce((sum, item) => sum + item.quantity, 0),
+        itemCount: cart.items.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        ),
       },
     };
   }

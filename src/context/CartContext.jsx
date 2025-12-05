@@ -1,37 +1,51 @@
-import { createContext, useContext, useMemo, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+} from "react";
 import apiService from "../services/apiService";
 
 const CartCtx = createContext();
 
 export function CartProvider({ children }) {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState({ items: [], restaurantId: null });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Load cart from backend on mount (if user is logged in)
+  // Load cart once on mount
   useEffect(() => {
     loadCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadCart() {
     try {
-      if (!apiService.token) return; // Not logged in, use local cart
+      if (!apiService.token) return;
       setLoading(true);
+
       const backendCart = await apiService.getCart();
+
       if (backendCart?.items) {
-        const cartItems = backendCart.items.map(item => ({
+        const cartItems = backendCart.items.map((item) => ({
           id: item.dishId,
           name: item.dish?.name || "Unknown Dish",
-          price: item.priceSnap,
-          qty: item.qty,
+          price: item.dish?.price ?? 0,
+          qty: item.quantity,
           restaurantId: item.dish?.restaurantId,
-          restaurantName: item.dish?.restaurant?.name
+          restaurantName: item.dish?.restaurant?.name,
         }));
-        setCart(cartItems);
+
+        const restaurantId =
+          backendCart.items.length > 0
+            ? backendCart.items[0].dish.restaurantId
+            : null;
+
+        setCart({ items: cartItems, restaurantId });
       }
     } catch (err) {
       console.error("Failed to load cart:", err);
-      // Continue with local cart if backend fails
     } finally {
       setLoading(false);
     }
@@ -39,143 +53,181 @@ export function CartProvider({ children }) {
 
   async function syncWithBackend(action, item, quantity = 1) {
     try {
-      if (!apiService.token) return; // Not logged in, skip sync
-      
+      if (!apiService.token) return;
+
       switch (action) {
-        case 'add':
+        case "setQuantity": {
           await apiService.addToCart({
             dishId: item.id,
-            qty: quantity,
-            priceSnap: item.price
+            quantity, // FINAL quantity
           });
           break;
-        case 'update':
-          // Find the cart item ID from backend
+        }
+        case "remove": {
           const backendCart = await apiService.getCart();
-          const cartItem = backendCart?.items?.find(i => i.dishId === item.id);
+          const cartItem = backendCart?.items?.find(
+            (i) => i.dishId === item.id
+          );
           if (cartItem) {
-            await apiService.updateCartItem(cartItem.id, quantity);
+            await apiService.removeFromCart(cartItem.id);
           }
           break;
-        case 'remove':
-          const cart = await apiService.getCart();
-          const itemToRemove = cart?.items?.find(i => i.dishId === item.id);
-          if (itemToRemove) {
-            await apiService.removeFromCart(itemToRemove.id);
-          }
-          break;
-        case 'clear':
+        }
+        case "clear": {
           await apiService.clearCart();
+          break;
+        }
+        default:
           break;
       }
     } catch (err) {
-      console.error(`Failed to sync cart ${action}:`, err);
-      setError(`Failed to update cart. Please try again.`);
+      console.error(`Failed to sync cart (${action}):`, err);
+      setError("Failed to update cart. Please try again.");
       setTimeout(() => setError(""), 3000);
     }
   }
 
+  // ------------ PUBLIC API ------------
+
   function add(item) {
-    setCart((c) => {
-      // Check if adding from different restaurant
-      if (c.length > 0 && c[0].restaurantId && item.restaurantId && c[0].restaurantId !== item.restaurantId) {
-        // In a real app, you'd show a confirmation dialog
-        console.warn("Items from different restaurants. Clearing cart.");
-        const newCart = [{ ...item, qty: 1 }];
-        syncWithBackend('clear').then(() => {
-          syncWithBackend('add', item, 1);
-        });
-        return newCart;
+    // 1) Compute new quantity based on CURRENT state
+    const existing = cart.items.find((x) => x.id === item.id);
+    const newQty = existing ? existing.qty + 1 : 1;
+
+    // 2) Update local state (pure)
+    setCart((prev) => {
+      const idx = prev.items.findIndex((x) => x.id === item.id);
+      let nextItems;
+
+      if (idx > -1) {
+        nextItems = prev.items.map((x, i) =>
+          i === idx ? { ...x, qty: newQty } : x
+        );
+      } else {
+        const newItem = {
+          ...item,
+          qty: 1,
+        };
+        nextItems = [...prev.items, newItem];
       }
 
-      const i = c.findIndex((x) => x.id === item.id);
-      if (i > -1) {
-        const copy = [...c];
-        const newQty = (copy[i].qty || 1) + 1;
-        copy[i] = { ...copy[i], qty: newQty };
-        syncWithBackend('update', item, newQty);
-        return copy;
-      }
-      
-      const newCart = [...c, { ...item, qty: 1 }];
-      syncWithBackend('add', item, 1);
-      return newCart;
+      return {
+        ...prev,
+        items: nextItems,
+        restaurantId: prev.restaurantId || item.restaurantId,
+      };
     });
+
+    // 3) One single backend call
+    syncWithBackend("setQuantity", item, newQty);
   }
 
-  function remove(id) {
-    setCart((c) => {
-      const i = c.findIndex((x) => x.id === id);
-      if (i === -1) return c;
-      
-      const copy = [...c];
-      const item = copy[i];
-      const newQty = (copy[i].qty || 1) - 1;
-      
+  function remove(item) {
+    const existing = cart.items.find((x) => x.id === item.id);
+    if (!existing) return;
+
+    const newQty = existing.qty - 1;
+
+    setCart((prev) => {
+      const idx = prev.items.findIndex((x) => x.id === item.id);
+      if (idx === -1) return prev;
+
+      let nextItems;
+
       if (newQty <= 0) {
-        copy.splice(i, 1);
-        syncWithBackend('remove', item);
+        nextItems = prev.items.filter((x) => x.id !== item.id);
       } else {
-        copy[i] = { ...copy[i], qty: newQty };
-        syncWithBackend('update', item, newQty);
+        nextItems = prev.items.map((x, i) =>
+          i === idx ? { ...x, qty: newQty } : x
+        );
       }
-      
-      return copy;
+
+      return {
+        ...prev,
+        items: nextItems,
+        restaurantId: nextItems.length === 0 ? null : prev.restaurantId,
+      };
     });
+
+    if (newQty <= 0) {
+      syncWithBackend("remove", item);
+    } else {
+      syncWithBackend("setQuantity", item, newQty);
+    }
   }
 
   function updateQuantity(id, qty) {
-    if (qty <= 0) {
-      remove(id);
-      return;
-    }
-    
-    setCart((c) => {
-      const i = c.findIndex((x) => x.id === id);
-      if (i === -1) return c;
-      
-      const copy = [...c];
-      const item = copy[i];
-      copy[i] = { ...copy[i], qty };
-      syncWithBackend('update', item, qty);
-      return copy;
+    const item = cart.items.find((x) => x.id === id);
+    if (!item) return;
+
+    setCart((prev) => {
+      const idx = prev.items.findIndex((x) => x.id === id);
+      if (idx === -1) return prev;
+
+      let nextItems;
+
+      if (qty <= 0) {
+        nextItems = prev.items.filter((x) => x.id !== id);
+      } else {
+        nextItems = prev.items.map((x, i) =>
+          i === idx ? { ...x, qty } : x
+        );
+      }
+
+      return {
+        ...prev,
+        items: nextItems,
+        restaurantId: nextItems.length === 0 ? null : prev.restaurantId,
+      };
     });
+
+    if (qty <= 0) {
+      syncWithBackend("remove", item);
+    } else {
+      syncWithBackend("setQuantity", item, qty);
+    }
   }
 
-  function clear() { 
-    setCart([]);
-    syncWithBackend('clear');
+  function clear() {
+    setCart({ items: [], restaurantId: null });
+    syncWithBackend("clear");
   }
 
-  // Calculate totals
   const totals = useMemo(() => {
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const deliveryFee = cart.length > 0 ? 49 : 0;
-    const tax = Math.round(subtotal * 0.05); // 5% tax
+    const subtotal = cart.items.reduce(
+      (sum, item) => sum + item.price * item.qty,
+      0
+    );
+    const deliveryFee = cart.items.length > 0 ? 49 : 0;
+    const tax = Math.round(subtotal * 0.05);
     const total = subtotal + deliveryFee + tax;
-    
+
     return {
       subtotal,
       deliveryFee,
       tax,
       total,
-      itemCount: cart.reduce((sum, item) => sum + item.qty, 0)
+      itemCount: cart.items.reduce((sum, item) => sum + item.qty, 0),
     };
   }, [cart]);
 
-  const value = useMemo(() => ({ 
-    cart, 
-    add, 
-    remove, 
-    updateQuantity,
-    clear, 
-    loading,
-    error,
-    totals,
-    isEmpty: cart.length === 0,
-    restaurantId: cart.length > 0 ? cart[0].restaurantId : null,
-    restaurantName: cart.length > 0 ? cart[0].restaurantName : null
-  }), [cart, loading, error, totals]);
+  const value = useMemo(
+    () => ({
+      cart,
+      add,
+      remove,
+      updateQuantity,
+      clear,
+      loading,
+      error,
+      totals,
+      isEmpty: cart.items.length === 0,
+      restaurantId: cart.restaurantId,
+      restaurantName:
+        cart.items.length > 0 ? cart.items[0].restaurantName : null,
+    }),
+    [cart, loading, error, totals]
+  );
 
   return <CartCtx.Provider value={value}>{children}</CartCtx.Provider>;
 }

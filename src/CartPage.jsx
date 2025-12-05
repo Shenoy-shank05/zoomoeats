@@ -4,8 +4,8 @@ import { useCart } from "./context/CartContext";
 export default function CartPage() {
   const { cart, add, remove, clear } = useCart();
   const navigate = useNavigate();
-  const subtotal = cart.reduce((s, i) => s + i.price * (i.qty || 1), 0);
-  const delivery = cart.length ? 49 : 0;
+  const subtotal = cart.items.reduce((s, i) => s + i.price * (i.qty || 1), 0); // Use cart.items
+  const delivery = cart.items.length ? 49 : 0; // Use cart.items
   const tax = Math.round(subtotal * 0.05);
   const total = subtotal + delivery + tax;
 
@@ -17,18 +17,18 @@ export default function CartPage() {
           <Link to="/" className="text-emerald-600 hover:underline">← Continue browsing</Link>
         </div>
 
-        {cart.length === 0 ? (
+        {cart.items.length === 0 ? ( // Use cart.items
           <div className="text-center text-gray-500">Cart is empty</div>
         ) : (
           <>
             <div className="space-y-3">
-              {cart.map((x)=>(
+              {cart.items.map((x) => ( // Use cart.items
                 <div key={x.id} className="p-3 rounded-2xl ring-1 ring-black/10 flex items-center justify-between bg-white dark:bg-white/5">
                   <div className="font-semibold">{x.name}</div>
                   <div className="flex items-center gap-2">
-                    <button onClick={()=>remove(x.id)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">-</button>
+                    <button onClick={() => remove(x.id)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">-</button>
                     <div>{x.qty || 1}</div>
-                    <button onClick={()=>add(x)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">+</button>
+                    <button onClick={() => add(x)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">+</button>
                   </div>
                   <div className="w-20 text-right">₹{x.price * (x.qty || 1)}</div>
                 </div>

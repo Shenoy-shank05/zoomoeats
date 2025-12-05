@@ -24,7 +24,7 @@ export default function RestaurantsPage() {
     try {
       setLoading(true);
       const data = await apiService.getRestaurants();
-      setRestaurants(data);
+      setRestaurants(Array.isArray(data) ? data : []); // Ensure restaurants is always an array
     } catch (err) {
       setError("Failed to load restaurants. Please try again.");
       console.error("Failed to fetch restaurants:", err);
@@ -36,6 +36,8 @@ export default function RestaurantsPage() {
   const chips = ["All","Pizza","Indian","Street Food","Cafe","Beverages","Desserts","Chinese"];
 
   const items = useMemo(() => {
+    if (!Array.isArray(restaurants)) return []; // Safeguard to ensure restaurants is an array
+
     return restaurants.filter(r => {
       const matchQ = search ? (
         r.name.toLowerCase().includes(search) || 

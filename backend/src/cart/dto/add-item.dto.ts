@@ -1,16 +1,13 @@
-import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsString, IsInt, Min, IsOptional } from 'class-validator';
 
 export class AddItemDto {
   @IsString()
   dishId: string;
 
-  @IsNumber()
+  // final quantity for this dish in cart (not delta)
+  @IsInt()
   @Min(1)
-  qty: number;
-
-  @IsNumber()
-  @Min(0)
-  priceSnap: number;
+  quantity: number;
 
   @IsOptional()
   @IsString()

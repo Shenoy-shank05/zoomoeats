@@ -9,7 +9,7 @@ export default function MenuPage() {
   const { id } = useParams();
   const location = useLocation();
   const mode = new URLSearchParams(location.search).get("mode") || "delivery";
-  const { add } = useCart();
+  const { add, remove, clear, cart } = useCart();
   const { user } = useContext(UserContext);
 
   const [restaurant, setRestaurant] = useState(null);
@@ -91,6 +91,25 @@ export default function MenuPage() {
       console.error("Failed to delete dish:", err);
       alert("Failed to delete dish. Please try again.");
     }
+  }
+
+  function handleAddToCart(dish) {
+    if (cart.restaurantId && cart.restaurantId !== restaurant.id) {
+      if (!window.confirm("Your cart contains items from another restaurant. Do you want to clear the cart and add this item?")) {
+        return;
+      }
+      clear(); // Clear the cart if the restaurant is different
+    }
+    add(dish); // Add the dish to the cart
+  }
+
+  function handleRemoveFromCart(dish) {
+    remove(dish); // Remove the dish from the cart
+  }
+
+  function getDishCount(dishId) {
+    const item = cart.items.find(item => item.id === dishId);
+    return item ? item.qty : 0;
   }
 
   if (loading) {
@@ -289,23 +308,17 @@ export default function MenuPage() {
                       </div>
                       <div className="font-semibold text-emerald-600">₹{dish.price}</div>
                     </div>
-                    <button 
-                      onClick={() => add({ 
-                        id: dish.id, 
-                        name: dish.name, 
-                        price: dish.price,
-                        restaurantId: restaurant.id,
-                        restaurantName: restaurant.name
-                      })} 
-                      disabled={!dish.isAvailable}
-                      className={`w-full px-3 py-2 rounded-xl font-medium transition ${
-                        dish.isAvailable 
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700" 
-                          : "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
-                      }`}
-                    >
-                      {dish.isAvailable ? "Add to Cart" : "Out of Stock"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {getDishCount(dish.id) > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleRemoveFromCart(dish)} className="px-2 py-1 bg-red-500 text-white rounded">-</button>
+                          <span>{getDishCount(dish.id)}</span>
+                          <button onClick={() => handleAddToCart(dish)} className="px-2 py-1 bg-green-500 text-white rounded">+</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => handleAddToCart(dish)} className="px-4 py-2 bg-blue-500 text-white rounded">Add</button>
+                      )}
+                    </div>
                     {isMerchantOrAdmin && (
                       <button 
                         onClick={() => handleDeleteDish(dish.id)} 
