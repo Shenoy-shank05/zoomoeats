@@ -26,7 +26,7 @@ export default function CartPage() {
                 <div key={x.id} className="p-3 rounded-2xl ring-1 ring-black/10 flex items-center justify-between bg-white dark:bg-white/5">
                   <div className="font-semibold">{x.name}</div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => remove(x.id)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">-</button>
+                    <button onClick={() => remove(x)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">-</button>
                     <div>{x.qty || 1}</div>
                     <button onClick={() => add(x)} className="px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10">+</button>
                   </div>
