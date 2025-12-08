@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useContext } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useCart } from "./context/CartContext";
 import { UserContext } from "./context/UserContext";
+import ThemeContext from "./context/ThemeContext";
 import { FiArrowLeft, FiClock, FiStar, FiRefreshCw, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import apiService from "./services/apiService";
 
@@ -11,6 +12,7 @@ export default function MenuPage() {
   const mode = new URLSearchParams(location.search).get("mode") || "delivery";
   const { add, remove, clear, cart } = useCart();
   const { user } = useContext(UserContext);
+  const { toggleTheme } = useContext(ThemeContext);
 
   const [restaurant, setRestaurant] = useState(null);
   const [dishes, setDishes] = useState([]);
@@ -231,7 +233,7 @@ export default function MenuPage() {
                   </span>
                 </div>
                 <div className="text-xs space-y-1">
-                  <div>₹{restaurant.minOrder || 199} min order • ₹{restaurant.deliveryFee || 49} delivery</div>
+                  <div>${restaurant.minOrder || 199} min order • ${restaurant.deliveryFee || 49} delivery</div>
                   <div>Mode: <span className="capitalize">{mode}</span></div>
                 </div>
                 {!restaurant.isOpen && (
@@ -306,7 +308,7 @@ export default function MenuPage() {
                           </div>
                         )}
                       </div>
-                      <div className="font-semibold text-emerald-600">₹{dish.price}</div>
+                      <div className="font-semibold text-emerald-600">${dish.price}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       {getDishCount(dish.id) > 0 ? (
@@ -407,6 +409,15 @@ export default function MenuPage() {
           </div>
         </div>
       )}
+
+      {/* Theme Toggle Button */}
+      <button 
+        onClick={toggleTheme} 
+        className="fixed bottom-4 right-4 p-3 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 transition"
+        title="Toggle Theme"
+      >
+        {user?.theme === 'dark' ? '🌙' : '☀️'}
+      </button>
     </div>
   );
 }

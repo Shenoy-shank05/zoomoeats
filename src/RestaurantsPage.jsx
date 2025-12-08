@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { FiSliders, FiStar, FiSearch } from "react-icons/fi";
 import apiService from "./services/apiService";
+import ThemeContext from './context/ThemeContext';
 
 export default function RestaurantsPage() {
   const loc = useLocation();
@@ -13,6 +14,8 @@ export default function RestaurantsPage() {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const { toggleTheme } = useContext(ThemeContext);
 
   useEffect(() => { setSearch(q); }, [q]);
 
@@ -141,7 +144,7 @@ export default function RestaurantsPage() {
                 <div className="font-semibold leading-tight">{r.name}</div>
                 <div className="text-xs text-gray-600 dark:text-gray-300">{r.cuisine || "Restaurant"}</div>
                 <div className="text-xs text-gray-600 dark:text-gray-300">
-                  {r.area || "Nearby"} · ₹{r.minOrder || 199} min order · {r.deliveryFee || 49} delivery
+                  {r.area || "Nearby"} · ${r.minOrder || 199} min order · {r.deliveryFee || 49} delivery
                 </div>
               </div>
             </Link>
@@ -153,6 +156,16 @@ export default function RestaurantsPage() {
             <p className="text-gray-500 dark:text-gray-400">No restaurants found matching your criteria.</p>
           </div>
         )}
+
+        {/* Theme toggle button */}
+        <div className="fixed bottom-4 right-4">
+          <button 
+            onClick={toggleTheme} 
+            className="px-4 py-2 rounded-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700 transition-all flex items-center gap-2"
+          >
+            Toggle Theme
+          </button>
+        </div>
       </div>
     </div>
   );

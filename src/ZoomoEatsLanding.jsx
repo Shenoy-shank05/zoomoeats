@@ -8,6 +8,7 @@ import {
 } from "react-icons/fi";
 import apiService from "./services/apiService";
 import { UserContext } from "./context/UserContext";
+import ThemeContext from "./context/ThemeContext";
 
 /* ----------------------------- tiny helpers ----------------------------- */
 function useLocalStorage(key, initial) {
@@ -23,6 +24,7 @@ const prefersReduced = () => window.matchMedia?.("(prefers-reduced-motion: reduc
 /* ============================== Landing ================================= */
 export default function ZoomoEatsLanding() {
   const { user, location: userLocation, setLocation: setUserLocation } = useContext(UserContext);
+  const { toggleTheme } = useContext(ThemeContext);
   const [dark, setDark] = useLocalStorage("ze_theme_dark", true);
   const [mode, setMode] = useState("Delivery");
   const [query, setQuery] = useState("");
@@ -46,8 +48,8 @@ export default function ZoomoEatsLanding() {
   const ticker = [
     "25% off on first 3 orders",
     "Wallet is live — 1-tap pay",
-    "Invite friends, get ₹150 credits",
-    "Free delivery above ₹199",
+    "Invite friends, get $150 credits",
+    "Free delivery above $199",
     "Now serving in 45+ cities",
   ];
   const categories = [
@@ -130,6 +132,14 @@ export default function ZoomoEatsLanding() {
     const el = document.documentElement;
     dark ? el.classList.add("dark") : el.classList.remove("dark");
   }, [dark]);
+
+  // Check localStorage for theme preference
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    }
+  }, []);
 
   function onSearch() {
     const parts = [];
@@ -460,7 +470,7 @@ function RestCard({ r, mode }) {
           <div className="font-semibold text-gray-900 dark:text-white leading-tight pr-2">{r.name}</div>
           <div className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200">{r.eta} mins</div>
         </div>
-        <div className="text-xs text-gray-600 dark:text-gray-300">{r.cuisine} · {r.area} · ₹{r.cost} for two</div>
+        <div className="text-xs text-gray-600 dark:text-gray-300">{r.cuisine} · {r.area} · ${r.cost} for two</div>
       </div>
     </Link>
   );
@@ -661,7 +671,7 @@ export function ProfileDrawer({ open, setOpen, user }) {
                 <div key={order.id} className="p-3 rounded-2xl ring-1 ring-white/10 flex items-center justify-between bg-white/70 dark:bg-[#0f0f0f]">
                   <div>
                     <div className="font-semibold">Order #{order.id}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-300">{order.status} • ₹{order.amount}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-300">{order.status} • ${order.amount}</div>
                   </div>
                   <button className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/10">Reorder</button>
                 </div>
@@ -704,7 +714,7 @@ function ChatWidget({ open, setOpen }) {
 
   function routeIntent(t) {
     const s = t.toLowerCase();
-    if (s.includes("deal") || s.includes("offer") || s.includes("promo")) return "Today's hot deals: ZOOMO50 for 50% off on select partners, BOGO for Buy 1 Get 1 on pizzas & rolls, FREESHIP for free delivery above ₹199. Which one interests you?";
+    if (s.includes("deal") || s.includes("offer") || s.includes("promo")) return "Today's hot deals: ZOOMO50 for 50% off on select partners, BOGO for Buy 1 Get 1 on pizzas & rolls, FREESHIP for free delivery above $199. Which one interests you?";
     if (s.includes("track") || s.includes("order") || s.includes("status") || s.includes("where")) return "To track your order, go to Profile > My Orders for live updates. Or share your order number for quick status!";
     if (s.includes("deliver") || s.includes("area") || s.includes("city") || s.includes("location") || s.includes("pincode")) return "We're serving in 45+ cities across India. Enter your location on the home page to check if we deliver to you. What's your area?";
     if (s.includes("pay") || s.includes("payment") || s.includes("wallet") || s.includes("upi") || s.includes("card") || s.includes("cod")) return "We accept UPI, Credit/Debit Cards, Zoomo Wallet, Net Banking, and Cash on Delivery. Secure and seamless! Any specific question?";

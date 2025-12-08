@@ -114,6 +114,75 @@ export class OrdersService {
 
     return order;
   }
+  async createOrder(userId: string, dto: CreateOrderDto) {
+  const { addressId, specialInstructions} = dto;
+
+  const cart = await this.prisma.cart.findUnique({
+    where: { userId },
+    include: {
+      items: {
+        include: {
+          dish: {
+            include: { restaurant: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!cart || cart.items.length === 0) {
+    throw new BadRequestException('Cart is empty');
+  }
+
+  const restaurant = cart.items[0].dish.restaurant;
+
+  const subtotal = cart.items.reduce(
+    (sum, item) => sum + item.dish.price * item.quantity,
+    0,
+  );
+  const deliveryFee = cart.items.length > 0 ? 49 : 0;
+  const tax = Math.round(subtotal * 0.05);
+  const total = subtotal + deliveryFee + tax ;
+
+  // (Optional) validate address belongs to user...
+
+  const order = await this.prisma.$transaction(async (tx) => {
+    const createdOrder = await tx.order.create({
+      data: {
+        userId,
+        restaurantId: restaurant.id,
+        addressId: addressId || undefined,
+        status: 'PENDING',
+        subtotal,
+        deliveryFee,
+        tax,
+        total,
+        specialInstructions,
+        items: {
+          create: cart.items.map((item) => ({
+            dishId: item.dishId,
+            quantity: item.quantity,
+            price: item.dish.price,
+            specialInstructions: item.specialInstructions,
+          })),
+        },
+      },
+      include: {
+        items: { include: { dish: true } },
+        restaurant: true,
+      },
+    });
+
+    await tx.cartItem.deleteMany({
+      where: { cartId: cart.id },
+    });
+
+    return createdOrder;
+  });
+
+  return order;
+}
+
 
   async findUserOrders(userId: string) {
     const orders = await this.prisma.order.findMany({

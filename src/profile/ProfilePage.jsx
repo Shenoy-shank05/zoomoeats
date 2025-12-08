@@ -38,7 +38,7 @@ export default function ProfilePage(){
               <div key={i} className="p-3 rounded-2xl ring-1 ring-black/10 flex items-center justify-between">
                 <div>
                   <div className="font-semibold">Order #{10230+i}</div>
-                  <div className="text-xs text-gray-600 dark:text-gray-300">Delivered • ₹{399 + i*15}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300">Delivered • ${399 + i*15}</div>
                 </div>
                 <button className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-white/10">Reorder</button>
               </div>
